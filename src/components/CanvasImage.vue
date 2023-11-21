@@ -1,7 +1,6 @@
 <template>
   <div class="CanvasImage">
     <canvas ref="canvas" :width="size" :height="size"></canvas>
-    <p>{{ size }}px</p>
   </div>
 </template>
 
@@ -32,9 +31,6 @@ function drawImageOnCanvas(ctx, img) {
     dh = dw / iRatio;
     dy = (ch - dh) / 2;
   }
-
-  console.log({iRatio, iw, ih, dx, dy, dw, dh});
-
   ctx.drawImage(img, 0, 0, iw, ih, dx, dy, dw, dh);
 }
 
