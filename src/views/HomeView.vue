@@ -1,16 +1,44 @@
+<template>
+  <main class="view-home">
+    <div class="canvas-container">
+      <CanvasImage
+        :size="400"
+        :image="image"
+        :radius="options.radius"
+        ref="canvasCompRef"
+      />
+    </div>
+    <aside>
+      <input id="imgInput" style="display: none;" type="file" @change="handleFileSelect" />
+      
+      <button type="button">
+        <label for="imgInput">
+          {{ image ? '重新选择' : '选择图片' }}
+        </label>
+      </button>
+      <OptionsForm
+        :options="options"
+        :selected="!!image"
+        @download="handleExport"
+      />
+    </aside>
+    <DialogExport v-model:params="exportParams" />
+  </main>
+</template>
+
 <script setup>
 import { ref, reactive } from "vue";
-import JSZip from 'jszip';
 import OptionsForm from '../components/OptionsForm.vue';
 import CanvasImage from "../components/CanvasImage.vue";
+import DialogExport from "../components/DialogExport.vue";
 import { toPng } from '../utils/svg2png';
 
 const image = ref(null);
-const canvasCompRefs = ref(null);
-const sizeList = ref([32, 64, 128, 180, 200, 400]);
+const canvasCompRef = ref(null);
+const exportParams = ref(null);
+
 const options = reactive({
-  width: null,
-  height: null
+  radius: 0
 });
 
 async function handleFileSelect(ev) {
@@ -42,71 +70,25 @@ async function handleFileSelect(ev) {
   options.height = image.value.height;
 }
 
-function handleExport() {
-  Promise.all(canvasCompRefs.value.map(item => {
-    return item.toBlob().then(blob => {
-      return {
-        size: item.size,
-        blob
-      }
-    });
-  })).then(res => {
-    const zip = new JSZip();
-    const fIcons = zip.folder("icons");
-    res.forEach(({size, blob}) => {
-      fIcons.file(`icon-${size}.png`, blob);
-    });
-    zip.generateAsync({type:"blob"}).then(function(blob) {
-      const url = URL.createObjectURL(blob);
-      const downloadLink = document.createElement('a');
-      downloadLink.href = url;
-      downloadLink.download = 'icons.zip';
-      downloadLink.click();
-    });
+function handleExport(options) {
+  const { sizeList } = options;
+  Promise.all(sizeList.map(size => canvasCompRef.value.toBlob(size))).then(res => {
+    exportParams.value = res;
   });
 }
 
 </script>
-
-<template>
-  <main class="view-home">
-    <CanvasImage
-      class="canvas"
-      :size="size"
-      :image="image"
-      ref="canvasCompRefs"
-    />
-    <aside>
-      <input id="imgInput" style="display: none;" type="file" @change="handleFileSelect" />
-      <label class="btn-upload" for="imgInput">{{ image ? '重新选择' : '选择图片' }}</label>
-      <OptionsForm
-        :options="options"
-      />
-    </aside>
-  </main>
-</template>
 
 <style>
 .view-home {
   padding: 16px;
   display: flex;
 }
-.canvas {
-  width: 400px;
-  height: 400px;
-  background: 
-    0 0/200px linear-gradient(45deg, #000 25%, transparent 0, transparent 75%, #000 0),
-    100px 100px/ 200px linear-gradient(45deg, #c80909 25%, transparent 0, transparent 75%, #c80909 0);
-}
-.btn-upload {
-  display: inline-block;
-  cursor: pointer;
-  padding: 8px 12px;
-  background-color: coral;
-  color: white;
-  border-radius: 8px;
-}
-.btn-upload:active {
-  background-color: rgba(255, 127, 80, .8);
+.canvas-container {
+  flex: 1 1 auto;
+  margin-right: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>

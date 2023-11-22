@@ -1,17 +1,33 @@
 <template>
   <div class="CanvasImage">
-    <canvas ref="canvas" :width="size" :height="size"></canvas>
+    <canvas ref="refCanvas" :width="size" :height="size"></canvas>
+    <p>{{ info }}</p>
   </div>
 </template>
 
 <script setup>
-import {defineProps, ref, watchEffect, onMounted} from 'vue';
+import {defineProps, ref, watchEffect, onMounted, computed} from 'vue';
 
-const props = defineProps(['size', 'image']);
+function clipRadius (ctx, x, y, w, h, r) {
+    const min_size = Math.min(w, h);
+    if (r > min_size / 2) r = min_size / 2;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    ctx.clip();
+}
+
+const props = defineProps(['size', 'image', 'radius']);
 let ctx = null;
-const canvas = ref(null);
+const refCanvas = ref(null);
 
-function drawImageOnCanvas(ctx, img) {
+function drawImageOnCanvas(ctx, img, r) {
+  if (!ctx || !img) return;
+  ctx.save();
   const { width: cw, height: ch } = ctx.canvas;
   const { width: iw, height: ih } = img;
   let dx = 0, 
@@ -31,38 +47,59 @@ function drawImageOnCanvas(ctx, img) {
     dh = dw / iRatio;
     dy = (ch - dh) / 2;
   }
+  if (r) {
+    clipRadius(ctx, dx, dy, dw, dh, r);
+  }
   ctx.drawImage(img, 0, 0, iw, ih, dx, dy, dw, dh);
+  ctx.restore();
 }
 
-function toBlob() {
+async function toBlob(size) {
+  let canvas;
+  if (size) {
+    canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    drawImageOnCanvas(ctx, props.image, props.radius);
+  } else {
+    size = props.size;
+    canvas = refCanvas.value;
+  }
+  
   return new Promise(resolve => {
-    canvas.value.toBlob((blob) => {
-      resolve(blob);
+    canvas.toBlob((blob) => {
+      resolve({ size, blob });
     }, 'image/png');
   });
 }
 
-defineExpose({
-  toBlob,
-  size: props.size
+const info = computed(() => {
+  if (!props.image) return '';
+  return `width: ${props.image.width} height: ${props.image.height}`;
 })
 
 onMounted(() => {
-  ctx = canvas.value.getContext('2d');
+  ctx = refCanvas.value.getContext('2d');
   watchEffect(() => {
-    if (!props.size || !props.image) return;
-    drawImageOnCanvas(ctx, props.image);
+    if (!props.image || !props.size) return;
+    drawImageOnCanvas(ctx, props.image, props.radius);
   });
-})
+});
+
+defineExpose({
+  toBlob
+});
 </script>
 
 <style scoped>
 .CanvasImage {
-  display: inline-block;
-  margin: 8px;
+  display: block;
 }
 .CanvasImage canvas {
-  border: 1px solid #333;
+  --color: #e3e3e3;
+  background: 
+    0 0/40px 40px linear-gradient(45deg, var(--color) 25%, transparent 0, transparent 75%, var(--color) 0),
+    20px 20px/40px 40px linear-gradient(45deg, var(--color) 25%, transparent 0, transparent 75%, var(--color) 0);
 }
 
 .CanvasImage p {

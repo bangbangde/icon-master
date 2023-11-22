@@ -25,5 +25,6 @@ import { RouterView } from 'vue-router'
 }
 .router-view {
   flex: 1 1 auto;
+  height: 0;
 }
 </style>
