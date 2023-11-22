@@ -11,6 +11,11 @@
              :data-to="item">
             </div>
           <div class="gradient-line" :style="gradientLineStyle">
+            <div
+              class="colorStop"
+              v-for="item in computedColorStops"
+              :key="item.key"
+            ></div>
             <div class="grip" id="grip" @mousedown="handleMousedown"></div>
           </div>
         </div>
@@ -34,14 +39,35 @@
     var angleRad = Math.atan2(dy, dx);
 
     // 将弧度转换为角度（0-360度）
-    var angleDeg = Math.round((angleRad * 180 / Math.PI + 360) % 360);
+    var angleDeg = (angleRad * 180 / Math.PI + 360) % 360;
 
     return angleDeg;
   }
+  function calculateDistanceToIntersection(squareSideLength, angleInDegrees) {
+    if (angleInDegrees === 0 || angleInDegrees % 90 === 0) {
+      return squareSideLength;
+    }
+    angleInDegrees = angleInDegrees % 90;
+    if (angleInDegrees > 45) {
+      angleInDegrees = 90 - angleInDegrees;
+    }
+    // 将角度转换为弧度
+    var angleInRadians = (angleInDegrees * Math.PI) / 180;
+
+    // 计算射线与正方形的交点坐标
+    var intersectionX = squareSideLength / 2 * Math.tan(angleInRadians);
+    var intersectionY = squareSideLength / 2;
+
+    // 计算交点到中心的距离
+    var distanceToIntersection = Math.sqrt(intersectionX * intersectionX + intersectionY * intersectionY);
+
+    return distanceToIntersection * 2;
+  }
   export default {
     data: () => ({
+      rectSize: 300,
       angle: 0,
-      sideOrCorner: 'to right',
+      sideOrCorner: 'to top right',
       // #e66465, #9198e5
       colorStops: [
         { color: '#e66465', stop: null },
@@ -50,6 +76,12 @@
       sideCorners: ['top', 'right', 'bottom', 'left', 'left top', 'right top', 'left bottom', 'right bottom']
     }),
     computed: {
+      computedColorStops() {
+        return []
+      },
+      lineLength() {
+        return calculateDistanceToIntersection(this.rectSize, this.computedAngle)
+      },
       gradientValue() {
         const colorStops = this.colorStops.map(item => {
           return `${item.color} ${item.stop || ''}`.trim();
@@ -66,7 +98,8 @@
       },
       style() {
         return {
-          color: 'red',
+          width: this.rectSize + 'px',
+          height: this.rectSize + 'px',
           backgroundImage: this.gradientValue
         }
       },
@@ -93,7 +126,8 @@
       },
       gradientLineStyle() {
         return {
-          transform: `rotate(${this.computedAngle - 90}deg)`
+          width: this.lineLength + 'px',
+          transform: `translate(-50%, -50%) rotate(${this.computedAngle - 90}deg)`
         }
       }
     },
@@ -121,11 +155,31 @@
       },
       handleMousemove(ev) {
         const {x, y} = ev;
-        const angle = calculateAngle(this.centerPoint, {x, y}) + 90;
-        if (this.sideOrCorner != 'custom') {
-          this.sideOrCorner = 'custom';
+        let angle = calculateAngle(this.centerPoint, {x, y}) + 90;
+        
+        if (angle >= 360) {
+          angle = angle - 360;
         }
-        this.angle = angle;
+        const match = [
+          [0, 'top'],
+          [45, 'right top'],
+          [90, 'right'],
+          [135, 'right bottom'],
+          [180, 'bottom'],
+          [225, 'left bottom'],
+          [270, 'left'],
+          [315, 'left top']
+        ].some(([v, k]) => {
+          if (Math.abs(angle - v) <= 0.5) {
+            this.sideOrCorner = 'to ' + k;
+            return true;
+          }
+        })
+        if (!match && this.sideOrCorner != 'custom') {
+          this.sideOrCorner = 'custom';
+        } 
+        this.angle = Math.round(angle);
+        
         ev.preventDefault();
       },
       handleMouseup() {
@@ -237,12 +291,12 @@
 .to-side-corner.right-bottom { right: 0; bottom: 0; transform: translate(100%, 100%); }
 
 .gradient-line {
-  width: 150%;
+  width: 100%;
   height: 2px;
   background-color: black;
   position: absolute;
-  left: calc(0px - 25%);
-  top: calc(50% - 1px);
+  left: 50%;
+  top: 50%;
   cursor: pointer;
 }
 .gradient-line::after {
